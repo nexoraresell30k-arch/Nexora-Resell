@@ -11,7 +11,7 @@
 <footer><div class="wrap foot"><div>© <span id="year"></span> NEXORA RESELL · Projet en préparation</div><div>Achète • Revends • Donne une seconde vie</div></div></footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-const SUPABASE_URL='https://zrpekwqvbkcwlrtjluht.supabase.co/rest/v1/'; // Renseigner depuis Supabase > Project Settings > API
+const SUPABASE_URL = 'https://zrpekwqvbkcwlrjluht.supabase.co'; // Renseigner depuis Supabase > Project Settings > API
 const SUPABASE_ANON_KEY='sb_publishable_MckM2BfFhlP2yKBAd4leVQ_AMWHeVX0'; // Clé publique anon / publishable, jamais la clé service_role
 const configured=Boolean(SUPABASE_URL&&SUPABASE_ANON_KEY);
 const client=configured&&window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;

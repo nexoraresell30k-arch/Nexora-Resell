@@ -1,0 +1,1487 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecuGest - Agent de Securite Incendie</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- jsPDF pour l'export PDF de la main courante -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            red: '#e50914',
+                            redHover: '#b20710',
+                            redGlow: 'rgba(229, 9, 20, 0.25)',
+                            darkBg: '#0d0d11',
+                            card: '#181820',
+                            cardHover: '#20202c',
+                            border: '#2a2a38',
+                            accent: '#ff3b30',
+                            textMuted: '#9aa0a6'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0d0d11;
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+        .red-glow {
+            box-shadow: 0 0 25px rgba(229, 9, 20, 0.25);
+        }
+        .red-glow-sm {
+            box-shadow: 0 0 12px rgba(229, 9, 20, 0.2);
+        }
+        .card-border {
+            border: 1px solid #2a2a38;
+        }
+        .card-border:hover {
+            border-color: #e50914;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d0d11;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a38;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e50914;
+        }
+        .tab-btn.active {
+            background-color: #e50914;
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-brand-red selection:text-white">
+
+    <!-- ECRAN DE CHARGEMENT -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-[#0d0d11]/90 backdrop-blur-md z-50 flex-col items-center justify-center" style="display: none;">
+        <div class="w-16 h-16 border-4 border-brand-red/20 border-t-brand-red rounded-full animate-spin"></div>
+        <p class="mt-4 font-bold text-lg text-white tracking-wider" id="loadingText">Connexion en cours...</p>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 bg-brand-red text-white px-6 py-3 rounded-2xl font-bold shadow-2xl transition-all duration-300 transform translate-y-20 opacity-0">
+        Action effectuee avec succes !
+    </div>
+
+    <!-- HEADER / NAVIGATION -->
+    <header class="sticky top-0 z-40 bg-[#0d0d11]/90 backdrop-blur-md border-b border-brand-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            
+            <!-- Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchView('accueil')">
+                <div class="w-11 h-11 bg-brand-red rounded-2xl flex items-center justify-center text-white text-xl font-black red-glow">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <span class="text-2xl font-extrabold tracking-wider text-white">SECU<span class="text-brand-red">GEST</span></span>
+                    <span class="block text-[10px] text-brand-textMuted tracking-widest font-semibold uppercase">Agent De Securite Incendie</span>
+                </div>
+            </div>
+
+            <!-- Desktop Navigation Tabs -->
+            <nav class="hidden md:flex items-center space-x-2 bg-[#181820] p-1.5 rounded-2xl border border-brand-border">
+                <button onclick="switchView('accueil')" id="nav-accueil" class="tab-btn active px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Accueil & Cours</span>
+                </button>
+                <button onclick="switchView('main-courante')" id="nav-main-courante" class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-clipboard-list"></i>
+                    <span>Main Courante</span>
+                </button>
+                <button onclick="switchView('calculateur')" id="nav-calculateur" class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>Calculateur ERP</span>
+                </button>
+                <button onclick="switchView('rondes')" id="nav-rondes" class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center space-x-2">
+                    <i class="fa-solid fa-route"></i>
+                    <span>Calculateur Rondes</span>
+                </button>
+                <button onclick="switchView('espace-admin')" id="nav-espace-admin" class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white transition-all duration-200 flex items-center space-x-2" style="display:none;">
+                    <i class="fa-solid fa-users-gear"></i>
+                    <span>Gestion Comptes BDD</span>
+                </button>
+            </nav>
+
+            <!-- Student Profile / Connexion Button -->
+            <div class="flex items-center space-x-3">
+                <button onclick="switchView('espace-eleve')" id="btn-espace-eleve" class="bg-brand-red hover:bg-brand-redHover text-white px-5 py-2.5 rounded-2xl font-semibold text-sm transition-all duration-200 flex items-center space-x-2 red-glow-sm">
+                    <i class="fa-solid fa-user-gear"></i>
+                    <span id="user-btn-label">Connexion Espace</span>
+                </button>
+
+                <!-- Mobile menu toggle -->
+                <button onclick="toggleMobileMenu()" class="md:hidden p-2.5 text-slate-300 bg-brand-card border border-brand-border rounded-2xl">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Drawer -->
+        <div id="mobile-menu" class="hidden md:hidden bg-brand-card border-b border-brand-border px-4 py-4 space-y-2">
+            <button onclick="switchView('accueil'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white font-medium flex items-center space-x-3">
+                <i class="fa-solid fa-book-open text-brand-red"></i>
+                <span>Accueil & Cours</span>
+            </button>
+            <button onclick="switchView('main-courante'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white font-medium flex items-center space-x-3">
+                <i class="fa-solid fa-clipboard-list text-brand-red"></i>
+                <span>Main Courante Virtuelle</span>
+            </button>
+            <button onclick="switchView('calculateur'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white font-medium flex items-center space-x-3">
+                <i class="fa-solid fa-calculator text-brand-red"></i>
+                <span>Calculateur ERP</span>
+            </button>
+            <button onclick="switchView('rondes'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white font-medium flex items-center space-x-3">
+                <i class="fa-solid fa-route text-brand-red"></i>
+                <span>Calculateur Rondes</span>
+            </button>
+            <button id="mobile-nav-admin" onclick="switchView('espace-admin'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-slate-800/50 text-white font-medium flex items-center space-x-3" style="display:none;">
+                <i class="fa-solid fa-users-gear text-brand-red"></i>
+                <span>Gestion Comptes BDD</span>
+            </button>
+            <button onclick="switchView('espace-eleve'); toggleMobileMenu()" class="w-full text-left px-4 py-3 rounded-xl bg-brand-red text-white font-medium flex items-center space-x-3">
+                <i class="fa-solid fa-user-gear"></i>
+                <span>Mon Espace Membre</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ================= VIEW 1: ACCUEIL & COURS ================= -->
+        <section id="view-accueil" class="space-y-10">
+            <div class="relative bg-gradient-to-r from-[#181820] via-[#1c1c2b] to-[#251015] p-8 sm:p-12 rounded-3xl border border-brand-border overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-80 h-80 bg-brand-red/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="max-w-2xl space-y-4 relative z-10">
+                    <span class="inline-flex items-center space-x-2 bg-brand-red/20 text-brand-red text-xs font-bold px-3 py-1.5 rounded-full border border-brand-red/30">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                        <span>FORMATION AGENT DE SECURITE INCENDIE</span>
+                    </span>
+                    <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                        Plateforme Pedagogique <span class="text-brand-red">Agent de Securite Incendie</span>
+                    </h1>
+                    <p class="text-slate-300 text-base sm:text-lg leading-relaxed">
+                        Accedez aux modules reglementaires, consultez les cours officiels de formation et gérez vos supports pédagogiques.
+                    </p>
+                    <div class="pt-2 flex flex-wrap gap-4">
+                        <button onclick="switchView('espace-eleve')" class="bg-brand-red hover:bg-brand-redHover text-white font-bold px-6 py-3.5 rounded-2xl transition-all duration-200 shadow-lg red-glow flex items-center space-x-2">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            <span>Connexion Espace Membre</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Aperçu rapide des icônes du haut -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                <div class="bg-brand-card p-6 rounded-2xl border border-brand-border flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-brand-red flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-shield-virus"></i>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white">SSIAP 1</div>
+                        <div class="text-xs text-brand-textMuted font-medium">Prevention & Rondes Incendie</div>
+                    </div>
+                </div>
+
+                <div class="bg-brand-card p-6 rounded-2xl border border-brand-border flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-heart-pulse"></i>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white">SST</div>
+                        <div class="text-xs text-brand-textMuted font-medium">Secourisme du travail</div>
+                    </div>
+                </div>
+
+                <div class="bg-brand-card p-6 rounded-2xl border border-brand-border flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-building-shield"></i>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white">ERP / IGH</div>
+                        <div class="text-xs text-brand-textMuted font-medium">Reglementation & Effectifs</div>
+                    </div>
+                </div>
+
+                <div class="bg-brand-card p-6 rounded-2xl border border-brand-border flex items-center space-x-4">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-radio"></i>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white">Radio & PC</div>
+                        <div class="text-xs text-brand-textMuted font-medium">Procedures & Alphabet OACI</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flash Infos -->
+            <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                <div class="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h2 class="text-xl font-extrabold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-bullhorn text-brand-red"></i>
+                            <span>Flash Infos & Messages de la Classe</span>
+                        </h2>
+                        <p class="text-xs text-brand-textMuted">Annonces officielles des professeurs</p>
+                    </div>
+                    <button id="btn-open-msg" onclick="toggleMsgBox()" class="hidden bg-brand-red hover:bg-brand-redHover text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Publier un Message</span>
+                    </button>
+                </div>
+
+                <div id="msg-box" class="hidden bg-[#0d0d11] p-5 rounded-2xl border border-brand-border space-y-4">
+                    <h4 class="text-sm font-bold text-white">Envoyer une annonce a toute la classe</h4>
+                    <form onsubmit="handlePostMessage(event)" class="space-y-3">
+                        <input type="text" id="msg-titre" required placeholder="Titre de l'annonce..." class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                        <textarea id="msg-contenu" rows="3" required placeholder="Redigez votre message..." class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white resize-none"></textarea>
+                        <div class="flex justify-end">
+                            <button type="submit" class="px-4 py-2 bg-brand-red text-white text-xs font-bold rounded-xl">Diffuser l'annonce</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="messages-container" class="space-y-4"></div>
+            </div>
+
+            <!-- COURS DE BASE COMPLETS (SSIAP, SST, MAIN COURANTE) + AJOUT DE PDF -->
+            <div>
+                <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+                    <h2 class="text-2xl font-extrabold text-white flex items-center space-x-3">
+                        <i class="fa-solid fa-layer-group text-brand-red"></i>
+                        <span>Modules de Formation & Documents PDF</span>
+                    </h2>
+                    <button id="btn-open-add-course-pdf" onclick="toggleAddCoursePdfBox()" class="hidden bg-brand-red hover:bg-brand-redHover text-white px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-file-arrow-up"></i>
+                        <span>Ajouter un PDF sur un cours</span>
+                    </button>
+                </div>
+
+                <!-- Formulaire d'ajout de PDF pour profs -->
+                <div id="add-course-pdf-box" class="hidden bg-brand-card p-6 rounded-2xl border border-brand-border mb-6 space-y-4">
+                    <h3 class="text-lg font-bold text-white">Glisser / Choisir un PDF pour un module de base</h3>
+                    <form onsubmit="handleAddCoursePdf(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Module Cible</label>
+                            <select id="course-pdf-target" class="w-full bg-[#0d0d11] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                <option value="0">Module 01: SSIAP 1 & Prevention Incendie</option>
+                                <option value="1">Module 02: Secourisme SST & Interventions</option>
+                                <option value="2">Module 03: Main Courante & Radiocommunication</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Fichier PDF</label>
+                            <input type="file" id="course-pdf-file" accept=".pdf" required class="w-full bg-[#0d0d11] border border-brand-border rounded-xl px-3 py-2 text-sm text-slate-300 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-red file:text-white hover:file:bg-brand-redHover">
+                        </div>
+                        <div class="sm:col-span-2 flex justify-end">
+                            <button type="submit" class="px-5 py-2.5 bg-brand-red text-white font-bold rounded-xl text-xs transition-all">Publier et lier le PDF</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Grille des cours de base -->
+                <div id="base-courses-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 2: CONNEXION & ESPACE MEMBRE ================= -->
+        <section id="view-espace-eleve" class="hidden space-y-8">
+            <div id="login-form-container" class="max-w-md mx-auto my-6 bg-brand-card p-8 rounded-3xl border border-brand-border red-glow-sm">
+                <div class="text-center space-y-3 mb-8">
+                    <div class="w-16 h-16 bg-brand-red/10 border border-brand-red/30 text-brand-red rounded-2xl flex items-center justify-center mx-auto text-2xl">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <h2 class="text-2xl font-extrabold text-white">Connexion SecuGest</h2>
+                    <p class="text-xs text-brand-textMuted">Eleve, Professeur ou Administrateur</p>
+                </div>
+
+                <div id="login-alert" class="hidden mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold text-center"></div>
+
+                <form onsubmit="handleLogin(event)" class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Identifiant (Login)</label>
+                        <input type="text" id="input-login" required placeholder="ex: admin, pmartin ou jdupont" class="w-full bg-[#0d0d11] border border-brand-border rounded-xl px-4 py-3 text-white text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Mot de Passe</label>
+                        <input type="password" id="input-password" required placeholder="••••••••" class="w-full bg-[#0d0d11] border border-brand-border rounded-xl px-4 py-3 text-white text-sm">
+                    </div>
+                    <button type="submit" class="w-full py-3.5 bg-brand-red text-white font-bold rounded-xl text-sm transition-all red-glow">Se Connecter</button>
+                </form>
+
+                <div class="mt-8 pt-6 border-t border-brand-border text-center text-xs text-brand-textMuted bg-[#0d0d11]/50 p-4 rounded-2xl space-y-1">
+                </div>
+            </div>
+
+            <!-- Dashboard Membre -->
+            <div id="student-dashboard" class="hidden space-y-8">
+                <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div class="flex items-center space-x-5">
+                        <div id="user-avatar" class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-brand-red to-rose-600 flex items-center justify-center text-white text-3xl font-black shadow-lg red-glow">A</div>
+                        <div class="space-y-1">
+                            <div class="flex items-center space-x-3">
+                                <h2 class="text-2xl font-black text-white" id="profile-name">Nom</h2>
+                                <span id="profile-role-badge" class="bg-emerald-500/15 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/30">Role</span>
+                            </div>
+                            <p class="text-sm text-slate-300 font-medium" id="profile-detail">Classe</p>
+                        </div>
+                    </div>
+                    <button onclick="handleLogout()" class="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-2xl font-bold text-sm">Se Deconnecter</button>
+                </div>
+
+                <!-- Notes -->
+                <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <h3 class="text-xl font-bold text-white">Releve des Notes</h3>
+                        <button id="btn-open-add-note" onclick="toggleAddNoteBox()" class="hidden bg-brand-red text-white px-4 py-2 rounded-xl text-xs font-bold">Attribuer une Note</button>
+                    </div>
+                    <div id="add-note-box" class="hidden bg-[#0d0d11] p-5 rounded-2xl border border-brand-border space-y-4">
+                        <form onsubmit="handleAddNote(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Eleve</label>
+                                <select id="note-eleve-select" required class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white"></select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Module</label>
+                                <select id="note-module-select" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                                    <option value="SSIAP 1">SSIAP 1</option>
+                                    <option value="SST">SST</option>
+                                    <option value="Main Courante">Main Courante</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Note / 20</label>
+                                <input type="number" id="note-val-input" min="0" max="20" step="0.5" required class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                            </div>
+                            <div class="sm:col-span-3 flex justify-end">
+                                <button type="submit" class="px-4 py-2 bg-brand-red text-white text-xs font-bold rounded-xl">Enregistrer</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-brand-border text-xs text-brand-textMuted uppercase font-semibold">
+                                    <th class="py-3 px-4">Eleve</th>
+                                    <th class="py-3 px-4">Module</th>
+                                    <th class="py-3 px-4">Note</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-notes-table" class="divide-y divide-brand-border text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 3: ESPACE ADMIN / PROF ================= -->
+        <section id="view-espace-admin" class="hidden space-y-8">
+            <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                <h2 class="text-2xl font-extrabold text-white">Gestion des Comptes BDD</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <h3 class="text-lg font-bold text-white">Creer un Compte</h3>
+                        <form onsubmit="handleCreateAccount(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Role</label>
+                                <select id="acc-role" onchange="toggleClasseField()" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                    <option value="eleve">Eleve</option>
+                                    <option value="prof">Professeur</option>
+                                </select>
+                            </div>
+                            <div id="acc-classe-group">
+                                <label class="block text-xs text-slate-400 mb-1">Classe</label>
+                                <select id="acc-classe" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                    <option value="Seconde MS">Seconde MS</option>
+                                    <option value="Premiere AS">Premiere AS</option>
+                                    <option value="Terminale AS">Terminale AS</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="acc-nom" required placeholder="Nom" class="bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                                <input type="text" id="acc-prenom" required placeholder="Prenom" class="bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                            </div>
+                            <input type="text" id="acc-login" required placeholder="Identifiant" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white font-mono">
+                            <input type="text" id="acc-mdp" value="temp123" required class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white font-mono">
+                            <button type="submit" class="w-full py-3 bg-brand-red text-white font-bold rounded-xl text-sm">Enregistrer</button>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <h3 class="text-lg font-bold text-white">Comptes Actifs</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="border-b border-brand-border text-xs text-brand-textMuted uppercase font-semibold">
+                                        <th class="py-3 px-3">Utilisateur</th>
+                                        <th class="py-3 px-3">Role</th>
+                                        <th class="py-3 px-3">Login</th>
+                                        <th class="py-3 px-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-accounts-table" class="divide-y divide-brand-border text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 4: MAIN COURANTE ================= -->
+        <section id="view-main-courante" class="hidden space-y-8">
+            <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <h2 class="text-2xl font-extrabold text-white">Registre de Main Courante Virtuelle</h2>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="exportMainCourantePDF()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 shadow-lg">
+                            <i class="fa-solid fa-file-pdf"></i>
+                            <span>Télécharger en PDF</span>
+                        </button>
+                        <button onclick="printMainCourante()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 shadow-lg">
+                            <i class="fa-solid fa-print"></i>
+                            <span>Imprimer le registre</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <h3 class="text-lg font-bold text-white">Nouvelle Écriture</h3>
+                        <form onsubmit="handleMainCouranteSubmit(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Nom de l'Agent</label>
+                                <input type="text" id="mc-agent" required placeholder="Nom de l'agent" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Type d'Événement</label>
+                                <select id="mc-type" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                    <option value="Ronde">Ronde de Securite</option>
+                                    <option value="Incendie">Alarme / Incendie</option>
+                                    <option value="Secours">Assistance SST</option>
+                                    <option value="Visiteur">Controle Visiteur</option>
+                                    <option value="Technique">Anomalie Technique</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Observations / Description</label>
+                                <textarea id="mc-obs" rows="4" required placeholder="Observations détaillées..." class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white resize-none"></textarea>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-brand-red hover:bg-brand-redHover text-white font-bold rounded-xl text-sm transition-all shadow-md">Inscrire l'evenement</button>
+                        </form>
+                    </div>
+                    
+                    <div class="lg:col-span-2 bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold text-white">Historique des Événements</h3>
+                            <button onclick="clearMainCourante()" class="text-xs text-red-400 hover:text-red-300 underline font-semibold">Effacer le registre</button>
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="sticky top-0 bg-[#181820] z-10">
+                                    <tr class="border-b border-brand-border text-xs text-brand-textMuted uppercase font-semibold">
+                                        <th class="py-3 px-3">Heure / Date</th>
+                                        <th class="py-3 px-3">Auteur</th>
+                                        <th class="py-3 px-3">Type</th>
+                                        <th class="py-3 px-3">Observations</th>
+                                        <th class="py-3 px-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="main-courante-table" class="divide-y divide-brand-border text-sm">
+                                    <!-- Rempli par script -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 5: CALCULATEUR ERP ================= -->
+        <section id="view-calculateur" class="hidden space-y-8">
+            <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-extrabold text-white flex items-center space-x-3">
+                        <i class="fa-solid fa-calculator text-brand-red"></i>
+                        <span>Calculateur de Catégorie d'Établissement Recevant du Public (ERP)</span>
+                    </h2>
+                    <p class="text-sm text-slate-300">
+                        Déterminez la catégorie de votre ERP selon l'effectif total (public + personnel) conformément au Code de la construction et de l'habitation (Art. R*123-19).
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Formulaire de calcul -->
+                    <div class="bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-5">
+                        <h3 class="text-lg font-bold text-white border-b border-brand-border pb-3">Paramètres de l'Établissement</h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Type d'ERP (Activité principale)</label>
+                                <select id="erp-type" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-3 text-sm text-white">
+                                    <option value="J">Type J : Structures d'accueil pour personnes âgées ou handicapées</option>
+                                    <option value="L">Type L : Salles d'auditions, de conférences, de réunions, spectacles ou à usage multiple</option>
+                                    <option value="M">Type M : Magasins de vente, centres commerciaux</option>
+                                    <option value="N">Type N : Restaurants et débits de boissons</option>
+                                    <option value="O">Type O : Hôtels et pensions de famille</option>
+                                    <option value="P">Type P : Salles de danse et salles de jeux</option>
+                                    <option value="R">Type R : Établissements d'enseignement, colonies de vacances</option>
+                                    <option value="S">Type S : Bibliothèques, centres de documentation</option>
+                                    <option value="U">Type U : Établissements sanitaires (hôpitaux, cliniques)</option>
+                                    <option value="V">Type V : Établissements de culte</option>
+                                    <option value="W">Type W : Administrations, banques, bureaux</option>
+                                    <option value="X">Type X : Établissements sportifs couverts</option>
+                                    <option value="Y">Type Y : Musées</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Effectif du Public</label>
+                                    <input type="number" id="erp-effectif-public" min="0" value="150" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-3 text-sm text-white" placeholder="ex: 200">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Effectif du Personnel</label>
+                                    <input type="number" id="erp-effectif-personnel" min="0" value="20" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-3 text-sm text-white" placeholder="ex: 25">
+                                </div>
+                            </div>
+
+                            <button type="button" onclick="calculerCategorieERP()" class="w-full py-3.5 bg-brand-red hover:bg-brand-redHover text-white font-bold rounded-xl text-sm transition-all shadow-lg red-glow-sm">
+                                Calculer la Catégorie ERP
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Résultat et explications -->
+                    <div class="bg-[#0d0d11] p-6 rounded-2xl border border-brand-border flex flex-col justify-between space-y-6">
+                        <div>
+                            <h3 class="text-lg font-bold text-white border-b border-brand-border pb-3 mb-4">Résultat de la Classification</h3>
+                            
+                            <div id="erp-result-container" class="space-y-4">
+                                <div class="bg-brand-card p-5 rounded-2xl border border-brand-border text-center space-y-2">
+                                    <span class="text-xs uppercase font-bold text-brand-textMuted tracking-wider">Catégorie Attribuée</span>
+                                    <div id="erp-res-categorie" class="text-3xl font-black text-brand-red">1ère Catégorie</div>
+                                    <div id="erp-res-type-label" class="text-sm font-semibold text-white">Type M : Magasins de vente</div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-3 text-center">
+                                    <div class="bg-brand-card p-3.5 rounded-xl border border-brand-border">
+                                        <div class="text-xs text-brand-textMuted">Effectif Total Calculé</div>
+                                        <div id="erp-res-total" class="text-lg font-bold text-white mt-1">170 personnes</div>
+                                    </div>
+                                    <div class="bg-brand-card p-3.5 rounded-xl border border-brand-border">
+                                        <div class="text-xs text-brand-textMuted">Type de Classement</div>
+                                        <div id="erp-res-classe" class="text-lg font-bold text-white mt-1">1er Groupe</div>
+                                    </div>
+                                </div>
+
+                                <div id="erp-res-details" class="text-xs text-slate-300 bg-brand-card p-4 rounded-xl border border-brand-border leading-relaxed">
+                                    <!-- Détails textuels réglementaires -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-brand-textMuted border-t border-brand-border pt-4 space-y-1">
+                            <p><strong>Rappel réglementaire :</strong></p>
+                            <p>• 1er groupe : 1ère catégorie (> 1500), 2e cat (701 à 1500), 3e cat (301 à 700), 4e cat (≤ 300 ou seuil minimal).</p>
+                            <p>• 2e groupe : 5ème catégorie (établissements sous le seuil du 1er groupe).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 6: CALCULATEUR DE RONDES MULTIPLES ================= -->
+        <section id="view-rondes" class="hidden space-y-8">
+            <div class="bg-brand-card p-6 sm:p-8 rounded-3xl border border-brand-border space-y-6">
+                <div class="space-y-2">
+                    <h2 class="text-2xl font-extrabold text-white flex items-center space-x-3">
+                        <i class="fa-solid fa-route text-brand-red"></i>
+                        <span>Calculateur & Planificateur de Plusieurs Rondes de Sécurité</span>
+                    </h2>
+                    <p class="text-sm text-slate-300">
+                        Gérez, planifiez et calculez la rotation de plusieurs rondes (SSIAP 1) sur votre site au cours d'une vacation (horaires, temps de parcours, fréquence).
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Formulaire d'ajout de ronde -->
+                    <div class="bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <h3 class="text-lg font-bold text-white">Créer / Configurer une Ronde</h3>
+                        <form onsubmit="handleAddRonde(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Nom / Zone de la Ronde</label>
+                                <input type="text" id="ronde-nom" required placeholder="ex: Ronde Technique Bâtiment A" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Type de Ronde</label>
+                                <select id="ronde-type" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                    <option value="Incendie & Sécurité">Incendie & Sécurité Générale</option>
+                                    <option value="Technique">Technique / Installations</option>
+                                    <option value="Fermeture">Ronde de Fermeture / Contrôle</option>
+                                    <option value="Nuit">Ronde de Nuit / Périodique</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Heure Début</label>
+                                    <input type="time" id="ronde-debut" value="21:00" required class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Heure Fin</label>
+                                    <input type="time" id="ronde-fin" value="05:00" required class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2 text-sm text-white">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold uppercase text-slate-400 mb-1">Fréquence (toutes les X heures)</label>
+                                <select id="ronde-frequence" class="w-full bg-[#181820] border border-brand-border rounded-xl px-3 py-2.5 text-sm text-white">
+                                    <option value="1">Toutes les 1 heure</option>
+                                    <option value="2" selected>Toutes les 2 heures</option>
+                                    <option value="3">Toutes les 3 heures</option>
+                                    <option value="4">Toutes les 4 heures</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-brand-red hover:bg-brand-redHover text-white font-bold rounded-xl text-sm transition-all shadow-md">Ajouter au Planning</button>
+                        </form>
+                    </div>
+
+                    <!-- Liste & Table des rondes planifiées -->
+                    <div class="lg:col-span-2 bg-[#0d0d11] p-6 rounded-2xl border border-brand-border space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-bold text-white">Planning Actif des Rondes Planifiées</h3>
+                            <button onclick="clearAllRondes()" class="text-xs text-red-400 hover:text-red-300 underline font-semibold">Tout réinitialiser</button>
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px] overflow-y-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="sticky top-0 bg-[#181820] z-10">
+                                    <tr class="border-b border-brand-border text-xs text-brand-textMuted uppercase font-semibold">
+                                        <th class="py-3 px-3">Intitulé</th>
+                                        <th class="py-3 px-3">Type</th>
+                                        <th class="py-3 px-3">Créneau</th>
+                                        <th class="py-3 px-3">Passages Générés</th>
+                                        <th class="py-3 px-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rondes-table" class="divide-y divide-brand-border text-sm">
+                                    <!-- Rempli par script -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-brand-card border-t border-brand-border py-8 mt-12 text-center text-xs text-brand-textMuted">
+        <p>SECUGEST &copy; 2026 - Plateforme de Gestion & Formation Agent de Sécurité Incendie.</p>
+    </footer>
+
+    <!-- SCRIPTS LOGIQUE -->
+    <script>
+        // --- BASE DE DONNÉES LOCALE & ÉTAT ---
+        let dbUsers = JSON.parse(localStorage.getItem('secugest_users')) || [
+            { id: 1, login: 'admin', mdp: 'admin123', nom: 'Administrateur', prenom: 'Principal', role: 'admin', classe: '-' },
+            { id: 2, login: 'pmartin', mdp: 'prof123', nom: 'Martin', prenom: 'Pierre', role: 'prof', classe: 'Terminale AS' },
+            { id: 3, login: 'jdupont', mdp: 'eleve123', nom: 'Dupont', prenom: 'Julien', role: 'eleve', classe: 'Terminale AS' },
+            { id: 4, login: 'elopez', mdp: 'eleve123', nom: 'Lopez', prenom: 'Emma', role: 'eleve', classe: 'Premiere AS' }
+        ];
+
+        let dbNotes = JSON.parse(localStorage.getItem('secugest_notes')) || [
+            { eleve: 'Dupont Julien', module: 'SSIAP 1', note: 15.5 },
+            { eleve: 'Dupont Julien', module: 'SST', note: 14.0 },
+            { eleve: 'Lopez Emma', module: 'SSIAP 1', note: 17.0 }
+        ];
+
+        let dbMessages = JSON.parse(localStorage.getItem('secugest_messages')) || [
+            { id: 1, titre: 'Consigne Générale - Rondes', contenu: 'Rappel : Toutes les rondes de nuit doivent être consignées précisément dans la main courante.', date: '17/09/2026', auteur: 'P. Martin (Professeur)' }
+        ];
+
+        let dbCoursePdfs = JSON.parse(localStorage.getItem('secugest_course_pdfs')) || {
+            0: null,
+            1: null,
+            2: null
+        };
+
+        let dbMainCourante = JSON.parse(localStorage.getItem('secugest_main_courante')) || [
+            { id: 1, heure: '17/09/2026 08:00', auteur: 'J. Dupont', type: 'Ronde', obs: 'Prise de poste et vérification des consignes.' },
+            { id: 2, heure: '17/09/2026 10:15', auteur: 'J. Dupont', type: 'Secours', obs: 'Assistance dispensée à un visiteur pris de malaise (SST).' }
+        ];
+
+        let dbRondes = JSON.parse(localStorage.getItem('secugest_rondes')) || [
+            { id: 1, nom: 'Ronde Générale RDC & Étages', type: 'Incendie & Sécurité', debut: '21:00', fin: '05:00', frequence: '2' }
+        ];
+
+        let currentUser = JSON.parse(localStorage.getItem('secugest_current_user')) || null;
+
+        // --- NAVIGATION VUES ---
+        function switchView(viewId) {
+            ['accueil', 'espace-eleve', 'espace-admin', 'main-courante', 'calculateur', 'rondes'].forEach(id => {
+                const el = document.getElementById('view-' + id);
+                if (el) el.classList.add('hidden');
+                const nav = document.getElementById('nav-' + id);
+                if (nav) nav.classList.remove('active');
+            });
+
+            const targetView = document.getElementById('view-' + viewId);
+            if (targetView) targetView.classList.remove('hidden');
+
+            const targetNav = document.getElementById('nav-' + viewId);
+            if (targetNav) targetNav.classList.add('active');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (viewId === 'espace-eleve') {
+                renderAuthView();
+            }
+            if (viewId === 'espace-admin') {
+                renderAdminView();
+            }
+            if (viewId === 'main-courante') {
+                renderMainCourante();
+            }
+            if (viewId === 'rondes') {
+                renderRondes();
+            }
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            if (!toast) return;
+            toast.innerText = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // --- AUTHENTIFICATION ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const loginInput = document.getElementById('input-login').value.trim();
+            const mdpInput = document.getElementById('input-password').value;
+            const alertBox = document.getElementById('login-alert');
+
+            const found = dbUsers.find(u => u.login === loginInput && u.mdp === mdpInput);
+            if (found) {
+                currentUser = found;
+                localStorage.setItem('secugest_current_user', JSON.stringify(currentUser));
+                alertBox.classList.add('hidden');
+                showToast('Connexion réussie ! Bienvenue ' + found.prenom);
+                updateInterfaceAccess();
+                switchView('espace-eleve');
+            } else {
+                alertBox.innerText = 'Identifiant ou mot de passe incorrect.';
+                alertBox.classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() {
+            currentUser = null;
+            localStorage.removeItem('secugest_current_user');
+            showToast('Déconnexion effectuée.');
+            updateInterfaceAccess();
+            switchView('accueil');
+        }
+
+        function updateInterfaceAccess() {
+            const btnLabel = document.getElementById('user-btn-label');
+            const navAdmin = document.getElementById('nav-espace-admin');
+            const mobAdmin = document.getElementById('mobile-nav-admin');
+
+            if (currentUser) {
+                if (btnLabel) btnLabel.innerText = currentUser.prenom + ' (' + currentUser.role.toUpperCase() + ')';
+                if (currentUser.role === 'admin' || currentUser.role === 'prof') {
+                    if (navAdmin) navAdmin.style.display = 'flex';
+                    if (mobAdmin) mobAdmin.style.display = 'flex';
+                } else {
+                    if (navAdmin) navAdmin.style.display = 'none';
+                    if (mobAdmin) mobAdmin.style.display = 'none';
+                }
+            } else {
+                if (btnLabel) btnLabel.innerText = 'Connexion Espace';
+                if (navAdmin) navAdmin.style.display = 'none';
+                if (mobAdmin) mobAdmin.style.display = 'none';
+            }
+            renderAccueilCourses();
+            renderMessages();
+        }
+
+        function renderAuthView() {
+            const formContainer = document.getElementById('login-form-container');
+            const dashboard = document.getElementById('student-dashboard');
+
+            if (currentUser) {
+                formContainer.classList.add('hidden');
+                dashboard.classList.remove('hidden');
+
+                document.getElementById('profile-name').innerText = currentUser.prenom + ' ' + currentUser.nom;
+                document.getElementById('profile-detail').innerText = 'Classe : ' + (currentUser.classe || 'Non assignée');
+                const badge = document.getElementById('profile-role-badge');
+                badge.innerText = currentUser.role.toUpperCase();
+
+                const avatar = document.getElementById('user-avatar');
+                avatar.innerText = currentUser.prenom.charAt(0).toUpperCase();
+
+                const btnAddNote = document.getElementById('btn-open-add-note');
+                if (currentUser.role === 'admin' || currentUser.role === 'prof') {
+                    if (btnAddNote) btnAddNote.classList.remove('hidden');
+                    populateElevesSelect();
+                } else {
+                    if (btnAddNote) btnAddNote.classList.add('hidden');
+                }
+                renderNotesTable();
+            } else {
+                formContainer.classList.remove('hidden');
+                dashboard.classList.add('hidden');
+            }
+        }
+
+        // --- COURS DE BASE & PDF ---
+        const baseCoursesData = [
+            {
+                id: 0,
+                title: "Module 01: SSIAP 1 & Prévention Incendie",
+                desc: "Principes de classement des ERP, feux et classes de feu, agents extincteurs, installations fixes d'extinction, services de sécurité incendie.",
+                icon: "fa-fire-extinguisher",
+                color: "text-red-500",
+                bg: "bg-red-500/10"
+            },
+            {
+                id: 1,
+                title: "Module 02: Secourisme SST & Interventions",
+                desc: "Rôle du secouriste, examens de la victime, hémorragies, obstructions des voies aériennes, inconscience, arrêt cardiorespiratoire (DEA).",
+                icon: "fa-briefcase-medical",
+                color: "text-emerald-400",
+                bg: "bg-emerald-500/10"
+            },
+            {
+                id: 2,
+                title: "Module 03: Main Courante & Radiocommunication",
+                desc: "Tenue réglementaire du registre de main courante, transmission des messages radio, alphabet phonétique international (OACI).",
+                icon: "fa-book-bookmark",
+                color: "text-amber-400",
+                bg: "bg-amber-500/10"
+            }
+        ];
+
+        function renderAccueilCourses() {
+            const grid = document.getElementById('base-courses-grid');
+            const btnAddPdf = document.getElementById('btn-open-add-course-pdf');
+            if (!grid) return;
+
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof')) {
+                if (btnAddPdf) btnAddPdf.classList.remove('hidden');
+            } else {
+                if (btnAddPdf) btnAddPdf.classList.add('hidden');
+            }
+
+            grid.innerHTML = '';
+            baseCoursesData.forEach(c => {
+                const pdfInfo = dbCoursePdfs[c.id];
+                let pdfBadgeHTML = '';
+                if (pdfInfo) {
+                    pdfBadgeHTML = `
+                        <div class="mt-4 pt-3 border-t border-brand-border flex items-center justify-between gap-3 text-xs overflow-hidden">
+                            <span class="text-emerald-400 font-semibold flex items-center space-x-1.5 truncate max-w-[65%]" title="${pdfInfo.name}">
+                                <i class="fa-solid fa-file-pdf shrink-0"></i>
+                                <span class="truncate">${pdfInfo.name}</span>
+                            </span>
+                            <button onclick="downloadCoursePdf(${c.id})" class="px-3 py-1.5 bg-brand-red hover:bg-brand-redHover text-white rounded-lg font-bold shrink-0 transition-all">Télécharger</button>
+                        </div>
+                    `;
+                }
+
+                const card = document.createElement('div');
+                card.className = "bg-brand-card p-6 rounded-3xl border border-brand-border flex flex-col justify-between space-y-4 card-border overflow-hidden";
+                card.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="w-12 h-12 rounded-2xl ${c.bg} ${c.color} flex items-center justify-center text-xl">
+                            <i class="fa-solid ${c.icon}"></i>
+                        </div>
+                        <h3 class="text-lg font-extrabold text-white break-words">${c.title}</h3>
+                        <p class="text-xs text-slate-300 leading-relaxed">${c.desc}</p>
+                    </div>
+                    ${pdfBadgeHTML}
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function toggleAddCoursePdfBox() {
+            const box = document.getElementById('add-course-pdf-box');
+            if (box) box.classList.toggle('hidden');
+        }
+
+        function handleAddCoursePdf(e) {
+            e.preventDefault();
+            const targetId = document.getElementById('course-pdf-target').value;
+            const fileInput = document.getElementById('course-pdf-file');
+
+            if (fileInput.files && fileInput.files[0]) {
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    dbCoursePdfs[targetId] = {
+                        name: file.name,
+                        data: event.target.result
+                    };
+                    localStorage.setItem('secugest_course_pdfs', JSON.stringify(dbCoursePdfs));
+                    showToast('PDF de cours ajouté avec succès !');
+                    toggleAddCoursePdfBox();
+                    renderAccueilCourses();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function downloadCoursePdf(courseId) {
+            const pdfInfo = dbCoursePdfs[courseId];
+            if (!pdfInfo) return;
+            const a = document.createElement('a');
+            a.href = pdfInfo.data;
+            a.download = pdfInfo.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast('Téléchargement du support PDF...');
+        }
+
+        // --- MESSAGES & FLASH INFOS ---
+        function toggleMsgBox() {
+            const box = document.getElementById('msg-box');
+            if (box) box.classList.toggle('hidden');
+        }
+
+        function handlePostMessage(e) {
+            e.preventDefault();
+            const titre = document.getElementById('msg-titre').value;
+            const contenu = document.getElementById('msg-contenu').value;
+            const now = new Date().toLocaleDateString('fr-FR');
+
+            dbMessages.unshift({
+                id: Date.now(),
+                titre,
+                contenu,
+                date: now,
+                auteur: currentUser ? (currentUser.prenom + ' ' + currentUser.nom + ' (' + currentUser.role + ')') : 'Professeur'
+            });
+            localStorage.setItem('secugest_messages', JSON.stringify(dbMessages));
+            showToast('Annonce publiée avec succès !');
+            document.getElementById('msg-titre').value = '';
+            document.getElementById('msg-contenu').value = '';
+            toggleMsgBox();
+            renderMessages();
+        }
+
+        function renderMessages() {
+            const container = document.getElementById('messages-container');
+            const btnOpenMsg = document.getElementById('btn-open-msg');
+            if (!container) return;
+
+            if (currentUser && (currentUser.role === 'admin' || currentUser.role === 'prof')) {
+                if (btnOpenMsg) btnOpenMsg.classList.remove('hidden');
+            } else {
+                if (btnOpenMsg) btnOpenMsg.classList.add('hidden');
+            }
+
+            container.innerHTML = '';
+            dbMessages.forEach(m => {
+                const div = document.createElement('div');
+                div.className = "bg-[#0d0d11] p-5 rounded-2xl border border-brand-border space-y-2";
+                div.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-circle-exclamation text-brand-red text-xs"></i>
+                            <span>${m.titre}</span>
+                        </span>
+                        <span class="text-[10px] text-brand-textMuted">${m.date} - ${m.auteur}</span>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">${m.contenu}</p>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // --- NOTES & BULLETINS ---
+        function toggleAddNoteBox() {
+            const box = document.getElementById('add-note-box');
+            if (box) box.classList.toggle('hidden');
+        }
+
+        function populateElevesSelect() {
+            const select = document.getElementById('note-eleve-select');
+            if (!select) return;
+            select.innerHTML = '';
+            dbUsers.filter(u => u.role === 'eleve').forEach(el => {
+                const opt = document.createElement('option');
+                opt.value = el.prenom + ' ' + el.nom;
+                opt.innerText = el.prenom + ' ' + el.nom + ' (' + el.classe + ')';
+                select.appendChild(opt);
+            });
+        }
+
+        function handleAddNote(e) {
+            e.preventDefault();
+            const eleve = document.getElementById('note-eleve-select').value;
+            const module = document.getElementById('note-module-select').value;
+            const note = parseFloat(document.getElementById('note-val-input').value);
+
+            dbNotes.push({ eleve, module, note });
+            localStorage.setItem('secugest_notes', JSON.stringify(dbNotes));
+            showToast('Note attribuée avec succès !');
+            toggleAddNoteBox();
+            renderNotesTable();
+        }
+
+        function renderNotesTable() {
+            const tbody = document.getElementById('student-notes-table');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            let filteredNotes = dbNotes;
+            if (currentUser && currentUser.role === 'eleve') {
+                const fullName = currentUser.prenom + ' ' + currentUser.nom;
+                filteredNotes = dbNotes.filter(n => n.eleve === fullName);
+            }
+
+            if (filteredNotes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="py-4 text-center text-slate-500 text-xs">Aucune note enregistrée.</td></tr>`;
+                return;
+            }
+
+            filteredNotes.forEach(n => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-brand-border/50";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-semibold text-white">${n.eleve}</td>
+                    <td class="py-3 px-4 text-slate-300">${n.module}</td>
+                    <td class="py-3 px-4 font-bold text-brand-red">${n.note} / 20</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- GESTION COMPTES ADMIN ---
+        function toggleClasseField() {
+            const role = document.getElementById('acc-role').value;
+            const group = document.getElementById('acc-classe-group');
+            if (role === 'prof') {
+                group.style.display = 'none';
+            } else {
+                group.style.display = 'block';
+            }
+        }
+
+        function handleCreateAccount(e) {
+            e.preventDefault();
+            const role = document.getElementById('acc-role').value;
+            const classe = role === 'prof' ? '-' : document.getElementById('acc-classe').value;
+            const nom = document.getElementById('acc-nom').value;
+            const prenom = document.getElementById('acc-prenom').value;
+            const login = document.getElementById('acc-login').value;
+            const mdp = document.getElementById('acc-mdp').value;
+
+            dbUsers.push({ id: Date.now(), login, mdp, nom, prenom, role, classe });
+            localStorage.setItem('secugest_users', JSON.stringify(dbUsers));
+            showToast('Compte créé avec succès !');
+            renderAdminView();
+            e.target.reset();
+        }
+
+        function deleteAccount(id) {
+            dbUsers = dbUsers.filter(u => u.id !== id);
+            localStorage.setItem('secugest_users', JSON.stringify(dbUsers));
+            showToast('Compte supprimé.');
+            renderAdminView();
+        }
+
+        function renderAdminView() {
+            const tbody = document.getElementById('admin-accounts-table');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            dbUsers.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-brand-border/50";
+                tr.innerHTML = `
+                    <td class="py-3 px-3 font-medium text-white">${u.prenom} ${u.nom} <span class="text-xs text-brand-textMuted block">${u.classe}</span></td>
+                    <td class="py-3 px-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${u.role === 'admin' ? 'bg-red-500/20 text-red-400' : u.role === 'prof' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}">${u.role}</span></td>
+                    <td class="py-3 px-3 font-mono text-xs text-slate-300">${u.login}</td>
+                    <td class="py-3 px-3 text-right">
+                        ${u.login !== 'admin' ? `<button onclick="deleteAccount(${u.id})" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 bg-red-500/10 rounded-lg">Supprimer</button>` : '<span class="text-xs text-slate-500">Protégé</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- MAIN COURANTE & PDF ---
+        function handleMainCouranteSubmit(e) {
+            e.preventDefault();
+            const agent = document.getElementById('mc-agent').value;
+            const type = document.getElementById('mc-type').value;
+            const obs = document.getElementById('mc-obs').value;
+            const now = new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+
+            dbMainCourante.unshift({
+                id: Date.now(),
+                heure: now,
+                auteur: agent,
+                type,
+                obs
+            });
+            localStorage.setItem('secugest_main_courante', JSON.stringify(dbMainCourante));
+            showToast('Événement consigné dans la main courante.');
+            document.getElementById('mc-obs').value = '';
+            renderMainCourante();
+        }
+
+        function clearMainCourante() {
+            if (confirm('Voulez-vous vraiment effacer tout le registre de main courante ?')) {
+                dbMainCourante = [];
+                localStorage.setItem('secugest_main_courante', JSON.stringify(dbMainCourante));
+                renderMainCourante();
+                showToast('Registre réinitialisé.');
+            }
+        }
+
+        function renderMainCourante() {
+            const tbody = document.getElementById('main-courante-table');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (dbMainCourante.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-500 text-xs">Aucun événement enregistré dans la main courante.</td></tr>`;
+                return;
+            }
+
+            dbMainCourante.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-brand-border/50";
+                tr.innerHTML = `
+                    <td class="py-3 px-3 text-xs font-mono text-brand-textMuted">${item.heure}</td>
+                    <td class="py-3 px-3 font-semibold text-white">${item.auteur}</td>
+                    <td class="py-3 px-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold bg-brand-red/15 text-brand-red">${item.type}</span></td>
+                    <td class="py-3 px-3 text-xs text-slate-300">${item.obs}</td>
+                    <td class="py-3 px-3 text-right">
+                        <button onclick="deleteMainCouranteItem(${item.id})" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function deleteMainCouranteItem(id) {
+            dbMainCourante = dbMainCourante.filter(i => i.id !== id);
+            localStorage.setItem('secugest_main_courante', JSON.stringify(dbMainCourante));
+            renderMainCourante();
+            showToast('Entrée supprimée.');
+        }
+
+        function exportMainCourantePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(18);
+            doc.setTextColor(229, 9, 20);
+            doc.text("SECUGEST - REGISTRE DE MAIN COURANTE", 14, 20);
+
+            doc.setFont("Helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text("Généré le : " + new Date().toLocaleString('fr-FR'), 14, 28);
+
+            let y = 40;
+            doc.setFillColor(240, 240, 240);
+            doc.rect(14, y, 182, 8, "F");
+            doc.setFont("Helvetica", "bold");
+            doc.setFontSize(9);
+            doc.setTextColor(50, 50, 50);
+            doc.text("Date / Heure", 16, y + 6);
+            doc.text("Agent", 50, y + 6);
+            doc.text("Type", 85, y + 6);
+            doc.text("Observations", 115, y + 6);
+
+            y += 12;
+            doc.setFont("Helvetica", "normal");
+
+            if (dbMainCourante.length === 0) {
+                doc.text("Aucun événement consigné dans le registre.", 14, y);
+            } else {
+                dbMainCourante.forEach((item, index) => {
+                    if (y > 270) {
+                        doc.addPage();
+                        y = 20;
+                    }
+                    doc.text(item.heure, 16, y);
+                    doc.text(item.auteur, 50, y);
+                    doc.text(item.type, 85, y);
+                    
+                    const splitObs = doc.splitTextToSize(item.obs, 85);
+                    doc.text(splitObs, 115, y);
+
+                    y += Math.max(8, splitObs.height * 5 + 2);
+                    doc.setDrawColor(220, 220, 220);
+                    doc.line(14, y - 2, 196, y - 2);
+                    y += 4;
+                });
+            }
+
+            doc.save("Main_Courante_SecuGest.pdf");
+            showToast("PDF de la main courante généré avec succès !");
+        }
+
+        function printMainCourante() {
+            const printWindow = window.open('', '_blank');
+            let html = `
+                <html>
+                <head>
+                    <title>Registre de Main Courante - SecuGest</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+                        h1 { color: #e50914; font-size: 20px; margin-bottom: 5px; }
+                        .date { font-size: 12px; color: #666; margin-bottom: 20px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 12px; }
+                        th { background-color: #f4f4f4; color: #111; }
+                    </style>
+                </head>
+                <body>
+                    <h1>SECUGEST - REGISTRE DE MAIN COURANTE</h1>
+                    <div class="date">Impression du : ${new Date().toLocaleString('fr-FR')}</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date / Heure</th>
+                                <th>Agent</th>
+                                <th>Type</th>
+                                <th>Observations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            if (dbMainCourante.length === 0) {
+                html += `<tr><td colspan="4" style="text-align: center; color: #777;">Aucun événement enregistré.</td></tr>`;
+            } else {
+                dbMainCourante.forEach(item => {
+                    html += `
+                        <tr>
+                            <td>${item.heure}</td>
+                            <td>${item.auteur}</td>
+                            <td><b>${item.type}</b></td>
+                            <td>${item.obs}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        }
+
+        // --- CALCULATEUR DE CATEGORIE D'ERP ---
+        function calculerCategorieERP() {
+            const type = document.getElementById('erp-type').value;
+            const publicEffectif = parseInt(document.getElementById('erp-effectif-public').value) || 0;
+            const personnelEffectif = parseInt(document.getElementById('erp-effectif-personnel').value) || 0;
+            const total = publicEffectif + personnelEffectif;
+
+            let categorieText = "";
+            let groupeText = "1er Groupe";
+            let detailsText = "";
+
+            if (total > 1500) {
+                categorieText = "1ère Catégorie";
+                detailsText = `L'effectif total (${total} personnes) dépasse 1 500 personnes. L'établissement relève de la 1ère catégorie du 1er groupe.`;
+            } else if (total >= 701) {
+                categorieText = "2ème Catégorie";
+                detailsText = `L'effectif total (${total} personnes) est compris entre 701 et 1 500 personnes. L'établissement relève de la 2ème catégorie du 1er groupe.`;
+            } else if (total >= 301) {
+                categorieText = "3ème Catégorie";
+                detailsText = `L'effectif total (${total} personnes) est compris entre 301 et 700 personnes. L'établissement relève de la 3ème catégorie du 1er groupe.`;
+            } else {
+                categorieText = "4ème Catégorie";
+                detailsText = `L'effectif total (${total} personnes) est inférieur ou égal à 300 personnes (selon les seuils du type ${type}). Établissement de 4ème catégorie (1er groupe).`;
+            }
+
+            if (total <= 50 && ['W', 'N', 'M'].includes(type)) {
+                categorieText = "5ème Catégorie";
+                groupeText = "2ème Groupe";
+                detailsText = `Avec ${total} personnes, cet établissement de type ${type} n'atteint pas le seuil du 1er groupe. Il est classé en 5ème catégorie.`;
+            }
+
+            document.getElementById('erp-res-categorie').innerText = categorieText;
+            document.getElementById('erp-res-type-label').innerText = "Type " + type + " (" + getErpTypeName(type) + ")";
+            document.getElementById('erp-res-total').innerText = total + " personnes";
+            document.getElementById('erp-res-classe').innerText = groupeText;
+            document.getElementById('erp-res-details').innerText = detailsText;
+
+            showToast('Calcul de catégorie effectué avec succès !');
+        }
+
+        function getErpTypeName(code) {
+            const types = {
+                'J': 'Structures d\'accueil personnes âgées / handicapées',
+                'L': 'Salles de réunions, spectacles, conférences',
+                'M': 'Magasins de vente, centres commerciaux',
+                'N': 'Restaurants et débits de boissons',
+                'O': 'Hôtels et pensions de famille',
+                'P': 'Salles de danse et salles de jeux',
+                'R': 'Établissements d\'enseignement',
+                'S': 'Bibliothèques, centres de doc',
+                'U': 'Établissements sanitaires et hôpitaux',
+                'V': 'Établissements de culte',
+                'W': 'Administrations, banques, bureaux',
+                'X': 'Établissements sportifs couverts',
+                'Y': 'Musées'
+            };
+            return types[code] || 'Divers';
+        }
+
+        // --- CALCULATEUR DE RONDES MULTIPLES ---
+        function handleAddRonde(e) {
+            e.preventDefault();
+            const nom = document.getElementById('ronde-nom').value;
+            const type = document.getElementById('ronde-type').value;
+            const debut = document.getElementById('ronde-debut').value;
+            const fin = document.getElementById('ronde-fin').value;
+            const frequence = document.getElementById('ronde-frequence').value;
+
+            dbRondes.push({
+                id: Date.now(),
+                nom,
+                type,
+                debut,
+                fin,
+                frequence
+            });
+            localStorage.setItem('secugest_rondes', JSON.stringify(dbRondes));
+            showToast('Ronde planifiée avec succès !');
+            e.target.reset();
+            renderRondes();
+        }
+
+        function clearAllRondes() {
+            if (confirm('Voulez-vous supprimer toutes les rondes planifiées ?')) {
+                dbRondes = [];
+                localStorage.setItem('secugest_rondes', JSON.stringify(dbRondes));
+                renderRondes();
+                showToast('Toutes les rondes ont été effacées.');
+            }
+        }
+
+        function deleteRonde(id) {
+            dbRondes = dbRondes.filter(r => r.id !== id);
+            localStorage.setItem('secugest_rondes', JSON.stringify(dbRondes));
+            renderRondes();
+            showToast('Ronde supprimée.');
+        }
+
+        function renderRondes() {
+            const tbody = document.getElementById('rondes-table');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (dbRondes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-500 text-xs">Aucune ronde planifiée pour le moment.</td></tr>`;
+                return;
+            }
+
+            dbRondes.forEach(r => {
+                let passages = [];
+                let [hDeb, mDeb] = r.debut.split(':').map(Number);
+                let [hFin, mFin] = r.fin.split(':').map(Number);
+                let freqHours = parseInt(r.frequence);
+
+                let currentMinutes = hDeb * 60 + mDeb;
+                let endMinutes = hFin * 60 + mFin;
+                if (endMinutes <= currentMinutes) {
+                    endMinutes += 24 * 60;
+                }
+
+                let stepMinutes = freqHours * 60;
+                while (currentMinutes <= endMinutes) {
+                    let realMin = currentMinutes % (24 * 60);
+                    let hh = String(Math.floor(realMin / 60)).padStart(2, '0');
+                    let mm = String(realMin % 60).padStart(2, '0');
+                    passages.push(`${hh}:${mm}`);
+                    currentMinutes += stepMinutes;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-brand-border/50";
+                tr.innerHTML = `
+                    <td class="py-3 px-3 font-semibold text-white break-words">${r.nom}</td>
+                    <td class="py-3 px-3"><span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400">${r.type}</span></td>
+                    <td class="py-3 px-3 text-xs text-slate-300 font-mono whitespace-nowrap">${r.debut} ➔ ${r.fin} (Toutes les ${r.frequence}h)</td>
+                    <td class="py-3 px-3 text-xs text-emerald-400 font-mono">
+                        <div class="flex flex-wrap gap-1 max-w-xs">
+                            ${passages.map(p => `<span class="bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">${p}</span>`).join('')}
+                        </div>
+                    </td>
+                    <td class="py-3 px-3 text-right">
+                        <button onclick="deleteRonde(${r.id})" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- INITIALISATION AU CHARGEMENT ---
+        window.addEventListener('DOMContentLoaded', () => {
+            updateInterfaceAccess();
+            renderAccueilCourses();
+            renderMessages();
+            calculerCategorieERP();
+        });
+    </script>
+</body>
+</html>

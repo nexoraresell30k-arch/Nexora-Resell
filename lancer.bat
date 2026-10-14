@@ -1,0 +1,6 @@
+@echo off
+echo Installation automatique des paquets necessaires...
+call npm install express sqlite3 cors
+echo Lancement de la base de donnees...
+node server.js
+pause
